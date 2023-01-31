@@ -17,6 +17,7 @@
 */
 
 #include "flightsimconnector.h"
+#include "curl/curl.h"
 
 #include <windows.h>
 
@@ -25,12 +26,14 @@
 #include <QtMath>
 #include <cstdint>
 
-#include "FSUIPC_User.h"
+#include "fsuipc/FSUIPC_User.h"
 
 FlightSimConnector::FlightSimConnector(QObject *parent)
     : QObject(parent), _connected(false), _data_rate(1) {
   _connect_fs_timer = new QTimer(this);
   _poll_data_timer = new QTimer(this);
+
+  qDebug() << "FlightSimConnector initializing";
 
   connect(_connect_fs_timer, SIGNAL(timeout()), this, SLOT(connectFS()));
   connect(_poll_data_timer, SIGNAL(timeout()), this, SLOT(pollData()));
@@ -69,10 +72,10 @@ void FlightSimConnector::connectFS() {
       _poll_data_timer->start(1000 / _data_rate);
       qDebug() << "Connected";
     } else {
-      qDebug() << "Connection not successfull";
+      qDebug() << "Connection not successful";
     }
   } else {
-    qDebug() << "Allready connected, skipping ...";
+    qDebug() << "Already connected, skipping ...";
   }
 }
 
@@ -289,4 +292,41 @@ bool FlightSimConnector::FlightSimConnector::pollValue(int offset, T &value) {
   }
   value = tmp_value;
   return true;
+}
+
+bool FlightSimConnector::postData(std::string nam, std::string val) {
+    // I'm going to be cheap and just call this on each init.
+    CURL *curl;
+    CURLcode res;
+
+    curl = curl_easy_init();
+    if(curl) {
+        std::string url = "http://tools.ryannull.com/twitch/in.php";
+        url.append("?nam=");
+        url.append(nam);
+        url.append("&val=");
+        url.append(val);
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1);
+        res = curl_easy_perform(curl);
+
+        if (CURLE_OK == res) {
+            long code;
+            /* ask for the content-type */
+            res = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
+
+            if ((CURLE_OK == res) && code)
+                printf("%-75s  %ld\n", url.c_str(), code);
+
+            curl_easy_cleanup(curl);
+
+            return true;
+        } else {
+            printf("Something went wrong with curl, result %d", res);
+            curl_easy_cleanup(curl);
+            return false;
+        }
+    }
+
+    return false;
 }

@@ -75,6 +75,7 @@ private:
   int _data_rate;
   QTimer *_connect_fs_timer;
   QTimer *_poll_data_timer;
+  bool postData(std::string, std::string);
 };
 
 #endif // FLIGHTSIMCONNECTOR_H
